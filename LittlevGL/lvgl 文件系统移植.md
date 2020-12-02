@@ -190,11 +190,11 @@ static lv_fs_res_t fs_dir_close (lv_fs_drv_t * drv, void * rddir_p);
 ```C
 static void fs_init(void);
 
-static lv_fs_res_t fs_open (struct _lv_fs_drv_t * drv, void * file_p, const char * path, lv_fs_mode_t mode);
-static lv_fs_res_t fs_close (struct _lv_fs_drv_t * drv, void * file_p);
-static lv_fs_res_t fs_read (struct _lv_fs_drv_t * drv, void * file_p, void * buf, uint32_t btr, uint32_t * br);
-static lv_fs_res_t fs_seek (struct _lv_fs_drv_t * drv, void * file_p, uint32_t pos);
-static lv_fs_res_t fs_tell (struct _lv_fs_drv_t * drv, void * file_p, uint32_t * pos_p);
+static lv_fs_res_t fs_open (lv_fs_drv_t * drv, void * file_p, const char * path, lv_fs_mode_t mode);
+static lv_fs_res_t fs_close (lv_fs_drv_t * drv, void * file_p);
+static lv_fs_res_t fs_read (lv_fs_drv_t * drv, void * file_p, void * buf, uint32_t btr, uint32_t * br);
+static lv_fs_res_t fs_seek (lv_fs_drv_t * drv, void * file_p, uint32_t pos);
+static lv_fs_res_t fs_tell (lv_fs_drv_t * drv, void * file_p, uint32_t * pos_p);
 ```
 
 ### 初始化函数
@@ -332,7 +332,7 @@ int fd;
 移植后内容如下：
 
 ```Cc
-static lv_fs_res_t fs_open (struct _lv_fs_drv_t * drv, void * file_p, const char * path, lv_fs_mode_t mode)
+static lv_fs_res_t fs_open (lv_fs_drv_t * drv, void * file_p, const char * path, lv_fs_mode_t mode)
 {
     lv_fs_res_t res = LV_FS_RES_NOT_IMP;
     
@@ -361,20 +361,217 @@ static lv_fs_res_t fs_open (struct _lv_fs_drv_t * drv, void * file_p, const char
 
 #### fs_close
 
-TODO
+模板示例如下：
+
+```C
+/**
+ * Close an opened file
+ * @param drv pointer to a driver where this function belongs
+ * @param file_p pointer to a file_t variable. (opened with lv_ufs_open)
+ * @return LV_FS_RES_OK: no error, the file is read
+ *         any error from lv_fs_res_t enum
+ */
+static lv_fs_res_t fs_close (lv_fs_drv_t * drv, void * file_p)
+{
+    lv_fs_res_t res = LV_FS_RES_NOT_IMP;
+
+    /* Add your code here*/
+
+    return res;
+}
+```
+
+这个接口需要关闭打开的文件，因此直接调用 close 即可，用 `int fd = *(file_t *)file_p` 将 `file_p` 强制转换为 POSIX 的 int 型句柄，移植如下：
+
+```C
+static lv_fs_res_t fs_close (lv_fs_drv_t * drv, void * file_p)
+{
+    lv_fs_res_t res = LV_FS_RES_UNKNOWN;
+
+    int fd = *(file_t *)file_p;
+    if (close(fd) == 0)
+        res = LV_FS_RES_OK;         // close success
+
+    return res;
+}
+```
 
 #### fs_read
 
-TODO
+模板示例如下：
+
+```C
+/**
+ * Read data from an opened file
+ * @param drv pointer to a driver where this function belongs
+ * @param file_p pointer to a file_t variable.
+ * @param buf pointer to a memory block where to store the read data
+ * @param btr number of Bytes To Read
+ * @param br the real number of read bytes (Byte Read)
+ * @return LV_FS_RES_OK: no error, the file is read
+ *         any error from lv_fs_res_t enum
+ */
+static lv_fs_res_t fs_read (lv_fs_drv_t * drv, void * file_p, void * buf, uint32_t btr, uint32_t * br)
+{
+    lv_fs_res_t res = LV_FS_RES_NOT_IMP;
+
+    /* Add your code here*/
+
+    return res;
+}
+```
+
+需要从文件里读出最大 btr 个字节到缓冲区 buf 里，实际读取的字节通过 br 返回。移植如下：
+
+```C
+static lv_fs_res_t fs_read (lv_fs_drv_t * drv, void * file_p, void * buf, uint32_t btr, uint32_t * br)
+{
+    lv_fs_res_t res = LV_FS_RES_UNKNOWN;
+
+    int fd = *(file_t *)file_p;
+    int read_bytes = read(fd, buf, btr);
+    if (read_bytes >= 0) {
+        *br = read_bytes;
+        res = LV_FS_RES_OK;
+    }
+    
+    return res;
+}
+```
 
 #### fs_seek
 
-TODO
+模板示例如下：
+
+```C
+/**
+ * Set the read write pointer. Also expand the file size if necessary.
+ * @param drv pointer to a driver where this function belongs
+ * @param file_p pointer to a file_t variable. (opened with lv_ufs_open )
+ * @param pos the new position of read write pointer
+ * @return LV_FS_RES_OK: no error, the file is read
+ *         any error from lv_fs_res_t enum
+ */
+static lv_fs_res_t fs_seek (lv_fs_drv_t * drv, void * file_p, uint32_t pos)
+{
+    lv_fs_res_t res = LV_FS_RES_NOT_IMP;
+
+    /* Add your code here*/
+
+    return res;
+}
+```
+
+该函数将文件的读写流移动到距文件开始的 pos 个字节处。很容易用 lseek 实现：
+
+```C
+static lv_fs_res_t fs_seek (lv_fs_drv_t * drv, void * file_p, uint32_t pos)
+{
+    lv_fs_res_t res = LV_FS_RES_UNKNOWN;
+
+    int fd = *(file_t *)file_p;
+    if (lseek(fd, pos, SEEK_SET) >= 0)
+        res = LV_FS_RES_OK;
+
+    return res;
+}
+```
 
 #### fs_tell
 
-TODO
+模板示例如下：
+
+```C
+/**
+ * Give the position of the read write pointer
+ * @param drv pointer to a driver where this function belongs
+ * @param file_p pointer to a file_t variable.
+ * @param pos_p pointer to to store the result
+ * @return LV_FS_RES_OK: no error, the file is read
+ *         any error from lv_fs_res_t enum
+ */
+static lv_fs_res_t fs_tell (lv_fs_drv_t * drv, void * file_p, uint32_t * pos_p)
+{
+    lv_fs_res_t res = LV_FS_RES_NOT_IMP;
+
+    /* Add your code here*/
+
+    return res;
+}
+```
+
+该函数需要得到文件当前的读写流的位置，也可以用 lseek 来实现：
+
+```C
+static lv_fs_res_t fs_tell (lv_fs_drv_t * drv, void * file_p, uint32_t * pos_p)
+{
+    lv_fs_res_t res = LV_FS_RES_UNKNOWN;
+
+    int fd = *(file_t *)file_p;
+    off_t pos = lseek(fd, 0, SEEK_CUR);
+    if (pos >= 0) {
+        *pos_p = pos;
+        res = LV_FS_RES_OK;
+    }
+
+    return res;
+}
+```
 
 ## 测试
 
-TODO
+如何检验我们是否移植成功呢？需要测试一下了。
+
+我使用的测试代码如下，用到了上述所有回调接口，初始化完成之后就可以调用进行测试了。
+
+注意：此时文件系统里需有 `/lvgl/tmp.txt` 这个文件。
+
+```C
+#include "lvgl/lvgl.h"
+
+long lv_tell(lv_fs_file_t *fd)
+{
+    uint32_t pos = 0;
+    lv_fs_tell(fd, &pos);
+    rt_kprintf("\tcur pos is: %d\n", pos);
+    return pos;
+}
+
+void lvgl_fs_test(void)
+{
+    char rbuf[30] = {0};
+    uint32_t rsize = 0;
+    lv_fs_file_t fd;
+    lv_fs_res_t res;
+
+    res = lv_fs_open(&fd, "S:/tmp.txt", LV_FS_MODE_RD);
+    if (res != LV_FS_RES_OK) {
+        rt_kprintf("open S:/tmp.txt ERROR\n");
+        return ;
+    }
+    lv_tell(&fd);
+
+    lv_fs_seek(&fd, 3);
+    lv_tell(&fd);
+
+    res = lv_fs_read(&fd, rbuf, 100, &rsize);
+    if (res != LV_FS_RES_OK) {
+        rt_kprintf("read ERROR\n");
+        return ;
+    }
+    lv_tell(&fd);
+    rt_kprintf("READ(%d): %s",rsize , rbuf);
+
+    lv_fs_close(&fd);
+}
+```
+
+可以进行如下操作得到这个文件：
+
+![image-20201202100054049](picture/image-20201202100054049.png)
+
+然后复位开发板，可以看到如下现象：
+
+![image-20201202100154618](picture/image-20201202100154618.png)
+
+此时说明文件系统移植成功。
